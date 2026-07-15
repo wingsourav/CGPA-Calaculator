@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Login | CGPA Calculator</title>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <main class="login-card">
+    <div class="logo">Σ</div>
+    <p class="eyebrow">STUDENT PORTAL</p>
+    <h1>Welcome back</h1>
+    <p class="intro">Sign in to continue with your saved CGPA calculations.</p>
+    <form id="loginForm">
+      <label for="userId">User ID</label>
+      <input id="userId" autocomplete="username" required placeholder="e.g. student_101">
+      <label for="password">Password</label>
+      <div class="password-field"><input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password"><button id="passwordToggle" class="password-toggle" type="button" aria-label="Show password" title="Show password">👁</button></div>
+      <p id="message" role="alert"></p>
+      <div class="account-actions"><button id="forgotPassword" class="text-button" type="button">Forgot password?</button><button id="changePassword" class="text-button" type="button">Change password</button></div>
+      <button class="primary" type="submit">Log in</button>
+      <button id="createAccount" class="secondary" type="button">Create new account</button>
+    </form>
+    <p class="note">User IDs are unique and your calculator data is saved on this device.</p>
+  </main>
+  <script src="login.js"></script>
+</body>
+</html>
