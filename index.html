@@ -27,15 +27,20 @@
             <span class="active">Subject-wise</span><span>Grade-wise</span>
           </button>
           <div class="theme-control">
-            <button
-              id="themeToggle"
-              class="theme-switch"
-              type="button"
-              aria-label="Switch between light and dark mode"
-            >
-              <span class="sun">☀</span><span class="moon">☾</span
-              ><span class="knob"></span>
-            </button>
+            <label class="switch" for="themeToggle">
+              <input type="checkbox" id="themeToggle" />
+              <div class="sunmoon">
+                <div class="darkside"></div>
+              </div>
+              <div class="border"></div>
+              <div class="clouds">
+                <img src="cloud_1.svg" alt="" class="cloud cloud-1" />
+                <img src="cloud_2.svg" alt="" class="cloud cloud-2" />
+                <img src="cloud_3.svg" alt="" class="cloud cloud-3" />
+                <img src="cloud_4.svg" alt="" class="cloud cloud-4" />
+                <img src="stars.svg" alt="" class="stars" />
+              </div>
+            </label>
             <button
               id="systemTheme"
               class="theme-system"
@@ -102,6 +107,16 @@
               </tr>
             </tfoot>
           </table>
+          <section id="aiInsights" class="ai-insights" aria-live="polite">
+            <div class="ai-insights-heading">
+              <div>
+                <p class="ai-kicker">AI-powered overview</p>
+                <h3>Academic insights</h3>
+              </div>
+              <span class="ai-badge">On-device</span>
+            </div>
+            <div id="aiInsightsContent"></div>
+          </section>
           <div class="actions result-actions">
             <span></span
             ><button

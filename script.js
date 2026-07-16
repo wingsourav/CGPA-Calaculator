@@ -14,8 +14,10 @@ const subjectPdfButtons = [downloadPdfSubject, downloadPdfSubjectTop];
 const setSubjectPdfDisabled = disabled => subjectPdfButtons.forEach(button => { button.disabled = disabled; });
 const formatCredits = value => value.toFixed(1).replace(/\.0$/, '');
 const marksheetGrades = new Set(['O', 'E', 'A', 'B', 'C', 'D', 'P', 'F', 'SA', 'M']);
-const marksheetCodePattern = /\b[A-Z1]{1,3}[0-9IO]{3,4}[A-Z]?\b/g;
-const marksheetRowPattern = /^(?:\d{1,2}[.)]?\s+)?([A-Z1]{1,3}[0-9IO]{3,4}[A-Z]?)\s+(.+?)\s+([0-9OIL]{1,3}(?:[.,][0-9OIL]{1,2})?)\s+([A-Z0-9]{1,2})$/i;
+// Supports both traditional codes (BH3403) and mixed codes (CS35M1).
+const marksheetCodeSource = '(?:[A-Z1]{1,4}[0-9IO]{3,4}[A-Z]?|[A-Z1]{2}[0-9IO]{2}[A-Z1][0-9IO])';
+const marksheetCodePattern = new RegExp(`\\b${marksheetCodeSource}\\b`, 'g');
+const marksheetRowPattern = new RegExp(`^(?:\\d{1,2}[.)]?\\s+)?(${marksheetCodeSource})\\s+(.+?)\\s+([0-9OIL]{1,3}(?:[.,][0-9OIL]{1,2})?)\\s+([A-Z0-9]{1,2})$`, 'i');
 const marksheetTailPattern = /([0-9OIL]{1,3}(?:[.,][0-9OIL]{1,2})?)\s+([A-Z0-9]{1,2})\s*$/i;
 
 const setSubjectError = message => {
@@ -37,7 +39,7 @@ const normalizeCredit = value => {
 
 const normalizeCode = value => {
   let normalized = String(value).toUpperCase().replace(/\s+/g, '');
-  normalized = normalized.replace(/^1/, 'I').replace(/(^[A-Z1]{1,3})([0-9IO]{3,4})([A-Z]?)$/, (_, prefix, digits, suffix) => `${prefix.replace(/1/g, 'I')}${digits.replace(/I/g, '1').replace(/O/g, '0')}${suffix}`);
+  normalized = normalized.replace(/^1/, 'I').replace(/([0-9IO]+)/g, digits => digits.replace(/I/g, '1').replace(/O/g, '0'));
   return normalized;
 };
 
@@ -52,7 +54,21 @@ const parseMarksheetRow = text => {
   return { code, subject, credit, grade };
 };
 
-const uniqueMarksheetRows = rows => rows.filter((row, index, source) => source.findIndex(candidate => candidate.code === row.code) === index);
+// OCR can read the same code in two slightly different ways (for example
+// EI1501 and EI501).  The subject name is a much better second identifier for
+// a marksheet row, so do not import a duplicated laboratory/subject row.
+const subjectKey = value => String(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const uniqueMarksheetRows = rows => {
+  const seenCodes = new Set();
+  const seenSubjects = new Set();
+  return rows.filter(row => {
+    const key = subjectKey(row.subject);
+    if (seenCodes.has(row.code) || (key.length > 5 && seenSubjects.has(key))) return false;
+    seenCodes.add(row.code);
+    if (key.length > 5) seenSubjects.add(key);
+    return true;
+  });
+};
 
 const extractRowsByCodeChunks = text => {
   const normalized = text.toUpperCase().replace(/\s+/g, ' ').trim();
@@ -85,7 +101,7 @@ const extractRowsByCodeChunks = text => {
 const extractRowsByLineJoin = text => {
   const rows = [];
   let pending = '';
-  const codeInLinePattern = /\b[A-Z1]{1,3}[0-9IO]{3,4}[A-Z]?\b/i;
+  const codeInLinePattern = new RegExp(`\\b${marksheetCodeSource}\\b`, 'i');
   text.split(/\r?\n/).map(line => line.trim().replace(/\s+/g, ' ')).forEach(line => {
     if (!line || /subject code|sl\.?\s*no|total credits|published on|sgpa|grade$/i.test(line)) return;
     if (codeInLinePattern.test(line.toUpperCase())) {
@@ -229,36 +245,93 @@ const preprocessCanvas = (canvas, threshold = null) => {
   return out;
 };
 
-const mergeOcrTexts = texts => {
-  const seen = new Set();
-  const lines = [];
-  texts.join('\n').split(/\r?\n/).forEach(line => {
-    const normalized = line.trim().replace(/\s+/g, ' ');
-    if (!normalized || seen.has(normalized)) return;
-    seen.add(normalized);
-    lines.push(normalized);
-  });
-  return lines.join('\n');
+const removeTableRules = canvas => {
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  const context = out.getContext('2d');
+  context.drawImage(canvas, 0, 0);
+  const imageData = context.getImageData(0, 0, out.width, out.height);
+  const { data } = imageData;
+  const darkAt = (x, y) => data[((y * out.width + x) * 4)] < 100;
+  const clearRow = y => {
+    for (let yy = Math.max(0, y - 1); yy <= Math.min(out.height - 1, y + 1); yy++) {
+      for (let x = 0; x < out.width; x++) { const index = (yy * out.width + x) * 4; data[index] = data[index + 1] = data[index + 2] = 255; }
+    }
+  };
+  const clearColumn = x => {
+    for (let xx = Math.max(0, x - 1); xx <= Math.min(out.width - 1, x + 1); xx++) {
+      for (let y = 0; y < out.height; y++) { const index = (y * out.width + xx) * 4; data[index] = data[index + 1] = data[index + 2] = 255; }
+    }
+  };
+  for (let y = 0; y < out.height; y++) {
+    let dark = 0;
+    for (let x = 0; x < out.width; x++) if (darkAt(x, y)) dark++;
+    if (dark > out.width * 0.55) clearRow(y);
+  }
+  for (let x = 0; x < out.width; x++) {
+    let dark = 0;
+    for (let y = 0; y < out.height; y++) if (darkAt(x, y)) dark++;
+    if (dark > out.height * 0.32) clearColumn(x);
+  }
+  context.putImageData(imageData, 0, 0);
+  return out;
 };
 
-const runOcrMultiPass = async source => {
-  const texts = [];
-  texts.push(await runOcr(source, { tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' }));
+const scaleCanvasForOcr = canvas => {
+  // Phone screenshots are commonly too small for the narrow credit/grade
+  // columns.  Tesseract is substantially more reliable with 250-300 dpi text.
+  const targetWidth = Math.min(3600, Math.max(canvas.width, 2200));
+  if (targetWidth === canvas.width) return canvas;
+  const scale = targetWidth / canvas.width;
+  const out = document.createElement('canvas');
+  out.width = Math.round(canvas.width * scale);
+  out.height = Math.round(canvas.height * scale);
+  const context = out.getContext('2d');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(canvas, 0, 0, out.width, out.height);
+  return out;
+};
+
+const runOcrPasses = async source => {
   const canvas = await renderSourceCanvas(source);
-  if (!canvas) return texts[0];
-  const grayscale = preprocessCanvas(canvas);
-  const thresholded = preprocessCanvas(canvas, 170);
-  texts.push(await runOcr(grayscale, { tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' }));
-  texts.push(await runOcr(thresholded, { tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' }));
-  return mergeOcrTexts(texts);
+  if (!canvas) return [await runOcr(source, { tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' })];
+  const scan = scaleCanvasForOcr(canvas);
+  const thresholded = preprocessCanvas(scan, 175);
+  const tableWithoutRules = removeTableRules(thresholded);
+  // Keep passes separate. Combining their text destroys row order and was the
+  // reason a real mark could be replaced by a duplicate OCR row.
+  return Promise.all([
+    runOcr(scan, { tessedit_pageseg_mode: '6', preserve_interword_spaces: '1', user_defined_dpi: '300' }),
+    runOcr(thresholded, { tessedit_pageseg_mode: '4', preserve_interword_spaces: '1', user_defined_dpi: '300' }),
+    runOcr(tableWithoutRules, { tessedit_pageseg_mode: '6', preserve_interword_spaces: '1', user_defined_dpi: '300' }),
+    runOcr(tableWithoutRules, { tessedit_pageseg_mode: '11', preserve_interword_spaces: '1', user_defined_dpi: '300' })
+  ]);
 };
 
 const getPdfLib = () => window.pdfjsLib || window['pdfjs-dist/build/pdf'] || null;
 
-const readTextFromMarksheet = async file => {
+const getPositionedPdfText = async page => {
+  const content = await page.getTextContent();
+  const lines = new Map();
+  content.items.forEach(item => {
+    const value = (item.str || '').trim();
+    if (!value) return;
+    const y = Math.round((item.transform?.[5] || 0) / 3) * 3;
+    if (!lines.has(y)) lines.set(y, []);
+    lines.get(y).push({ x: item.transform?.[4] || 0, value });
+  });
+  return [...lines.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([, items]) => items.sort((a, b) => a.x - b.x).map(item => item.value).join(' '))
+    .join('\n');
+};
+
+const readMarksheetTextCandidates = async file => {
   ensureMarksheetTools();
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-  if (!isPdf) return runOcrMultiPass(file);
+  if (!isPdf) return runOcrPasses(file);
   const pdfLib = getPdfLib();
   if (!pdfLib) throw new Error('PDF reader is unavailable. Please refresh and try again.');
   if (!pdfLib.GlobalWorkerOptions.workerSrc) {
@@ -266,26 +339,58 @@ const readTextFromMarksheet = async file => {
   }
   const data = new Uint8Array(await file.arrayBuffer());
   const pdf = await pdfLib.getDocument({ data }).promise;
-  let textLayerOutput = '';
-  let ocrOutput = '';
+  const candidates = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
     const page = await pdf.getPage(pageNumber);
     try {
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str || '').join(' ').trim();
-      if (pageText) textLayerOutput += `\n${pageText}`;
+      const pageText = await getPositionedPdfText(page);
+      if (pageText) candidates.push(pageText);
     } catch (error) {
-      textLayerOutput += '';
+      // A scanned PDF has no usable text layer; OCR below will handle it.
     }
-    const viewport = page.getViewport({ scale: 2 });
+    const viewport = page.getViewport({ scale: 3 });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    ocrOutput += `\n${await runOcrMultiPass(canvas)}`;
+    candidates.push(...await runOcrPasses(canvas));
   }
-  const primaryText = textLayerOutput.trim().length > 50 ? textLayerOutput : '';
-  return `${primaryText}\n${ocrOutput}`.trim();
+  return candidates.filter(Boolean);
+};
+
+const extractBestMarksheetRows = candidates => {
+  const parsed = candidates.map(extractMarksheetRows).filter(rows => rows.length);
+  if (!parsed.length) return [];
+  parsed.sort((a, b) => b.length - a.length);
+  // Start with the clearest complete pass, then fill only genuinely missing
+  // subjects from another pass. This recovers faint rows without duplicates.
+  return uniqueMarksheetRows(parsed.flat());
+};
+
+const fileToDataUrl = file => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(new Error('Unable to prepare the uploaded file for AI analysis.'));
+  reader.readAsDataURL(file);
+});
+
+const analyzeMarksheetWithOpenAI = async file => {
+  if (file.size > 7 * 1024 * 1024) throw new Error('This marksheet is too large for AI analysis. Please upload a file under 7 MB.');
+  const response = await fetch('/api/analyze-marksheet', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file: { name: file.name, type: file.type || 'application/octet-stream', data: await fileToDataUrl(file) } })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'AI analysis is unavailable.');
+  const rows = (result.subjects || []).map(item => ({
+    code: normalizeCode(item.code),
+    subject: String(item.subject || '').trim().replace(/\s+/g, ' '),
+    credit: normalizeCredit(item.credit),
+    grade: String(item.grade || '').toUpperCase().replace(/^0$/, 'O')
+  })).filter(item => item.code && item.subject && item.credit > 0 && marksheetGrades.has(item.grade));
+  if (!rows.length) throw new Error('AI could not identify valid subject rows in this marksheet.');
+  return uniqueMarksheetRows(rows);
 };
 
 const importMarksheet = async (card, input, triggerButton) => {
@@ -294,10 +399,17 @@ const importMarksheet = async (card, input, triggerButton) => {
   setSubjectError('');
   const defaultLabel = triggerButton.textContent;
   triggerButton.disabled = true;
-  triggerButton.textContent = 'Analyzing...';
+  triggerButton.textContent = 'AI analyzing...';
   try {
-    const text = await readTextFromMarksheet(file);
-    const rows = extractMarksheetRows(text);
+    let rows;
+    try {
+      rows = await analyzeMarksheetWithOpenAI(file);
+    } catch (aiError) {
+      // The existing on-device scanner keeps the upload usable if the user has
+      // not configured an API key or the AI service is temporarily unavailable.
+      const candidates = await readMarksheetTextCandidates(file);
+      rows = extractBestMarksheetRows(candidates);
+    }
     if (!rows.length) throw new Error('Could not detect subject rows. Upload a clearer marksheet image or PDF.');
     const { skippedGrades } = applyMarksheetRows(card, rows);
     if (skippedGrades) {
@@ -366,6 +478,27 @@ semesters.addEventListener('input', event => {
   if (card) updateSemesterCreditTotal(card);
 });
 
+const renderAcademicInsights = (cgpa, totalCredits) => {
+  const subjects = [...semesters.children].flatMap(card => [...card.querySelectorAll('.subject-row')]
+    .map(row => ({
+      name: row.querySelector('.subject-name').value.trim(),
+      credits: Number(row.querySelector('.credits').value),
+      points: Number(row.querySelector('.grade').value),
+      grade: row.querySelector('.grade').selectedOptions[0]?.textContent.split(' ')[0] || ''
+    }))
+    .filter(item => item.name && item.credits > 0 && Number.isFinite(item.points)));
+  const content = document.querySelector('#aiInsightsContent');
+  if (!content || !subjects.length) return;
+  const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+  const strongest = [...subjects].sort((a, b) => b.points - a.points || b.credits - a.credits).slice(0, 3);
+  const focus = [...subjects].sort((a, b) => a.points - b.points || b.credits - a.credits).slice(0, 2);
+  const currentPoints = subjects.reduce((sum, item) => sum + (item.credits * item.points), 0);
+  const gain = focus.reduce((sum, item) => sum + (item.credits * (Math.min(10, item.points + 1) - item.points)), 0);
+  const level = cgpa >= 8.5 ? 'an excellent' : cgpa >= 7.5 ? 'a strong' : cgpa >= 6.5 ? 'a steady' : 'a developing';
+  const list = items => items.map(item => `${escape(item.name)} (${item.grade})`).join(', ');
+  content.innerHTML = `<p class="ai-summary">You have ${level} CGPA profile at <strong>${cgpa.toFixed(2)}</strong>, based on ${formatCredits(totalCredits)} completed credits.</p><ul class="ai-insight-list"><li><strong>Your strengths:</strong> ${list(strongest)}.</li><li><strong>Suggested focus:</strong> Review ${list(focus)} first; these subjects have the greatest room to improve your weighted result.</li><li><strong>Potential next step:</strong> Raising those focus subjects by one grade point would move this result to about <strong>${((currentPoints + gain) / totalCredits).toFixed(2)}</strong>.</li></ul>`;
+};
+
 document.querySelector('#calculate').onclick = () => {
   const output = [];
   const error = document.querySelector('#error');
@@ -389,6 +522,7 @@ document.querySelector('#calculate').onclick = () => {
   document.querySelector('#totalCredits').textContent = totalCredits.toFixed(1).replace(/\.0$/, '');
   document.querySelector('#totalPoints').textContent = totalPoints.toFixed(1);
   document.querySelector('#cgpa').textContent = document.querySelector('#finalCgpa').textContent = cgpa.toFixed(2);
+  renderAcademicInsights(cgpa, totalCredits);
   document.querySelector('#result').style.display = 'block';
   setSubjectPdfDisabled(false);
   document.querySelector('#result').scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -508,12 +642,18 @@ const systemTheme = document.querySelector('#systemTheme');
 const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
 let savedTheme = localStorage.getItem('cgpa-theme') || 'system';
 const applyTheme = theme => {
-  if (theme === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', theme);
-  const dark = theme === 'dark' || (theme === 'system' && systemDark.matches);
-  themeToggle.classList.toggle('dark', dark); themeToggle.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode'); systemTheme.classList.toggle('active', theme === 'system');
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', theme);
+    const dark = theme === 'dark' || (theme === 'system' && systemDark.matches);
+    themeToggle.checked = dark;
+    systemTheme.classList.toggle('active', theme === 'system');
 };
 applyTheme(savedTheme);
-themeToggle.onclick = () => { const currentlyDark = document.documentElement.getAttribute('data-theme') === 'dark' || (!document.documentElement.hasAttribute('data-theme') && systemDark.matches); savedTheme = currentlyDark ? 'light' : 'dark'; localStorage.setItem('cgpa-theme', savedTheme); applyTheme(savedTheme); };
+themeToggle.addEventListener('change', () => {
+    const isDark = themeToggle.checked;
+    savedTheme = isDark ? 'dark' : 'light';
+    localStorage.setItem('cgpa-theme', savedTheme);
+    applyTheme(savedTheme);
+});
 systemTheme.onclick = () => { savedTheme = 'system'; localStorage.setItem('cgpa-theme', savedTheme); applyTheme(savedTheme); };
 systemDark.addEventListener('change', () => { if (savedTheme === 'system') applyTheme('system'); });
 

@@ -1,0 +1,7 @@
+{
+  "name": "cgpa-calculator",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  }
+}

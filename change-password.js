@@ -1,6 +1,7 @@
-const form = document.querySelector('#verifyUserForm');
+﻿﻿const form = document.querySelector('#verifyUserForm');
 const userId = document.querySelector('#userId');
 const message = document.querySelector('#message');
+
 
 form.addEventListener('submit', event => {
   event.preventDefault();

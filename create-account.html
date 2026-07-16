@@ -1,30 +1,71 @@
-<!doctype html>
+﻿﻿<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create Account | CGPA Calculator</title>
-  <link rel="stylesheet" href="login.css">
-</head>
-<body>
-  <main class="login-card">
-    <div class="logo">Σ</div>
-    <p class="eyebrow">STUDENT PORTAL</p>
-    <h1>Create account</h1>
-    <p class="intro">Set up your personal space for saving CGPA calculations.</p>
-    <form id="createAccountForm">
-      <label for="fullName">Full Name</label>
-      <input id="fullName" autocomplete="name" required placeholder="Enter your full name">
-      <label for="userId">User ID</label>
-      <input id="userId" autocomplete="username" required placeholder="Choose a unique user ID">
-      <label for="password">Password</label>
-      <div class="password-field"><input id="password" type="password" autocomplete="new-password" required minlength="13" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{13,}" title="Use at least 13 characters, including an uppercase letter, a number, and a special character." placeholder="Create a strong password"><button id="passwordToggle" class="password-toggle" type="button" aria-label="Show password" title="Show password">👁</button></div>
-      <small id="passwordHelp" class="password-help">At least 13 characters, with an uppercase letter, number, and special character.</small>
-      <p id="message" role="alert"></p>
-      <button class="primary" type="submit">Create account</button>
-      <button id="backToLogin" class="secondary" type="button">Back to login</button>
-    </form>
-  </main>
-  <script src="create-account.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Account | CGPA Calculator</title>
+    <link rel="stylesheet" href="login.css" />
+    <link
+      href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="auth-image-page">
+    <div class="wrapper">
+      <button id="backToLogin" class="back-button" type="button">
+        <i class="bx bx-arrow-back"></i>
+      </button>
+      <form id="createAccountForm">
+        <h1>Create Account</h1>
+        <div class="input-box">
+          <i class="bx bx-user"></i>
+          <input
+            id="fullName"
+            autocomplete="name"
+            required
+            placeholder="Full Name"
+          />
+        </div>
+        <div class="input-box">
+          <i class="bx bx-id-card"></i>
+          <input
+            id="userId"
+            autocomplete="username"
+            required
+            placeholder="User ID"
+          />
+        </div>
+        <div class="input-box">
+          <i class="bx bx-lock-alt"></i>
+          <input
+            id="password"
+            type="password"
+            autocomplete="new-password"
+            required
+            minlength="8"
+            pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}"
+            title="Use at least 8 characters, including an uppercase letter, a number, and a special character."
+            placeholder="Create a strong password"
+          />
+          <button
+            id="passwordToggle"
+            class="password-toggle"
+            type="button"
+            aria-label="Show password"
+            title="Show password"
+          >
+            <i class="bx bx-hide" id="passwordToggleIcon"></i>
+          </button>
+        </div>
+        <small id="passwordHelp" class="password-help"
+          >At least 8 characters, with an uppercase letter, number, and special
+          character.</small
+        >
+        <p id="message" role="alert"></p>
+        <button class="btn" type="submit">Create account</button>
+      </form>
+    </div>
+    <script src="create-account.js"></script>
+  </body>
 </html>

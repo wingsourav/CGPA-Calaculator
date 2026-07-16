@@ -1,29 +1,71 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Login | CGPA Calculator</title>
-  <link rel="stylesheet" href="login.css">
-</head>
-<body>
-  <main class="login-card">
-    <div class="logo">Σ</div>
-    <p class="eyebrow">STUDENT PORTAL</p>
-    <h1>Welcome back</h1>
-    <p class="intro">Sign in to continue with your saved CGPA calculations.</p>
-    <form id="loginForm">
-      <label for="userId">User ID</label>
-      <input id="userId" autocomplete="username" required placeholder="e.g. student_101">
-      <label for="password">Password</label>
-      <div class="password-field"><input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password"><button id="passwordToggle" class="password-toggle" type="button" aria-label="Show password" title="Show password">👁</button></div>
-      <p id="message" role="alert"></p>
-      <div class="account-actions"><button id="forgotPassword" class="text-button" type="button">Forgot password?</button><button id="changePassword" class="text-button" type="button">Change password</button></div>
-      <button class="primary" type="submit">Log in</button>
-      <button id="createAccount" class="secondary" type="button">Create new account</button>
-    </form>
-    <p class="note">User IDs are unique and your calculator data is saved on this device.</p>
-  </main>
-  <script src="login.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Student Login | CGPA Calculator</title>
+    <link rel="stylesheet" href="login.css" />
+    <link
+      href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="login-page">
+    <div class="wrapper">
+      <form id="loginForm">
+        <h1>Welcome Back</h1>
+        <div class="input-box">
+          <i class="bx bx-user"></i>
+          <input
+            id="userId"
+            autocomplete="username"
+            required
+            placeholder="User ID"
+          />
+        </div>
+        <div class="input-box">
+          <i class="bx bx-lock-alt"></i>
+          <input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            placeholder="Password"
+          />
+          <button
+            id="passwordToggle"
+            class="password-toggle"
+            type="button"
+            aria-label="Show password"
+            title="Show password"
+          >
+            <i class="bx bx-hide" id="passwordToggleIcon"></i>
+          </button>
+        </div>
+        <div class="remember-forgot">
+          <label><input type="checkbox" />Remember me</label>
+          <button id="forgotPassword" class="text-button" type="button">
+            Forgot password?
+          </button>
+        </div>
+        <p id="message" role="alert"></p>
+        <button type="submit" class="btn">Login</button>
+        <div class="register-link">
+          <p>
+            Don't have an account?
+            <button id="createAccount" class="text-button" type="button">
+              Register
+            </button>
+          </p>
+          <p>
+            <button id="changePassword" class="text-button" type="button">
+              Change password
+            </button>
+          </p>
+        </div>
+      </form>
+    </div>
+    <script src="login.js"></script>
+  </body>
 </html>

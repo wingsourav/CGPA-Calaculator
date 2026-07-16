@@ -1,8 +1,9 @@
-const form = document.querySelector('#recoveryForm');
+﻿﻿const form = document.querySelector('#recoveryForm');
 const userId = document.querySelector('#userId');
 const fullName = document.querySelector('#fullName');
 const message = document.querySelector('#message');
 const passwordResult = document.querySelector('#passwordResult');
+
 
 form.addEventListener('submit', event => {
   event.preventDefault();
